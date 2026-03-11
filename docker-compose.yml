@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: cvtailor
+      POSTGRES_USER: cvtailor
+      POSTGRES_PASSWORD: cvtailor
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
