@@ -32,3 +32,4 @@ class TailoringRunResponse(BaseModel):
     selected_projects: List[RankedProject]
     parsed_job_json: str
     parsed_profile_json: str
+    docx_path: str = ""
