@@ -6,6 +6,8 @@ from app.routers.profiles import router as profiles_router
 from app.routers.jobs import router as jobs_router
 from app.routers.applications import router as applications_router
 from app.routers.tailoring import router as tailoring_router
+from app.routers.github import router as github_router
+from app.routers.exports import router as exports_router
 
 from app.models.user import User
 from app.models.profile import Profile
@@ -14,7 +16,7 @@ from app.models.application import ApplicationVersion
 
 app = FastAPI(
     title="AI CV Tailor V3 Backend",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 Base.metadata.create_all(bind=engine)
@@ -24,6 +26,8 @@ app.include_router(profiles_router)
 app.include_router(jobs_router)
 app.include_router(applications_router)
 app.include_router(tailoring_router)
+app.include_router(github_router)
+app.include_router(exports_router)
 
 
 @app.get("/")
