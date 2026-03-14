@@ -27,6 +27,7 @@ def run_tailoring_engine(
     job_posting_id: int,
     github_projects: list[GithubProject],
     master_cv_latex: str = "",
+    output_language: str = "fr",
 ) -> dict:
     profile = db.get(Profile, profile_id)
     if not profile or profile.user_id != current_user_id:
@@ -48,25 +49,35 @@ def run_tailoring_engine(
 
     selected_projects = rank_projects(projects_to_use, parsed_job)
 
-    tailored_summary = generate_tailored_summary(parsed_cv, parsed_job, selected_projects)
-    tailored_experience_bullets = generate_experience_bullets(parsed_cv, parsed_job)
-    cover_letter = generate_cover_letter(parsed_cv, parsed_job, selected_projects)
+    tailored_summary = generate_tailored_summary(
+        parsed_cv, parsed_job, selected_projects, output_language=output_language
+    )
+    tailored_experience_bullets = generate_experience_bullets(
+        parsed_cv, parsed_job, output_language=output_language
+    )
+    cover_letter = generate_cover_letter(
+        parsed_cv, parsed_job, selected_projects, output_language=output_language
+    )
     tailored_resume_markdown = generate_resume_markdown(
         parsed_cv=parsed_cv,
         parsed_job=parsed_job,
         selected_projects=selected_projects,
         tailored_summary=tailored_summary,
         tailored_experience_bullets=tailored_experience_bullets,
+        output_language=output_language,
     )
 
     compatibility_score = compute_compatibility_score(parsed_cv, parsed_job, selected_projects)
     ats_score = compute_ats_score(tailored_resume_markdown, parsed_job)
     docx_path = export_resume_to_docx(tailored_resume_markdown)
+    latex_source = (master_cv_latex or "").strip() or (profile.master_cv_latex or "").strip()
+
     pdf_path = export_latex_to_pdf_with_tectonic(
-        master_cv_latex=master_cv_latex,
+        master_cv_latex=latex_source,
         tailored_summary=tailored_summary,
         tailored_experience_bullets=tailored_experience_bullets,
         selected_projects=selected_projects,
+        output_language=output_language,
     )
 
     profile.parsed_summary_json = json.dumps(parsed_cv, ensure_ascii=False)

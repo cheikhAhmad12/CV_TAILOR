@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Literal
 
 from app.schemas.github import GithubProject
 
@@ -9,6 +9,7 @@ class TailoringRunRequest(BaseModel):
     job_posting_id: int
     github_projects: List[GithubProject] = Field(default_factory=list)
     master_cv_latex: str = ""
+    output_language: Literal["fr", "en"] = "fr"
     use_llm: bool = False
 
 

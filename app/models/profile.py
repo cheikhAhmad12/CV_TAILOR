@@ -12,6 +12,7 @@ class Profile(Base):
 
     title: Mapped[str] = mapped_column(String(255), default="Master CV", nullable=False)
     master_cv_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    master_cv_latex: Mapped[str] = mapped_column(Text, default="", nullable=False)
     github_username: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     parsed_summary_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
 

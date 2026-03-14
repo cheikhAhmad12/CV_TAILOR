@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y gcc libpq-dev curl ca-certificates libgraphite2-3 && \
+RUN apt-get update && apt-get install -y gcc libpq-dev curl ca-certificates libgraphite2-3 fontconfig && \
     TECTONIC_URL="$(curl -fsSL https://api.github.com/repos/tectonic-typesetting/tectonic/releases/latest | grep -Eo 'https://[^"]*tectonic-[0-9.]+-x86_64-unknown-linux-gnu.tar.gz' | head -n1)" && \
     mkdir -p /tmp/tectonic-dist && \
     curl -fsSL "$TECTONIC_URL" -o /tmp/tectonic.tar.gz && \

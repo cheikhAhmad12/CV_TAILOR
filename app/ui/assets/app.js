@@ -1,19 +1,93 @@
+const authView = document.getElementById("auth-view");
+const appView = document.getElementById("app-view");
 const tokenStatus = document.getElementById("token-status");
 const profilesOutput = document.getElementById("profiles-output");
 const jobsOutput = document.getElementById("jobs-output");
 const tailorOutput = document.getElementById("tailor-output");
 const docxLink = document.getElementById("docx-link");
 const pdfLink = document.getElementById("pdf-link");
+const compiledCvFrame = document.getElementById("compiled-cv-frame");
+
+const tabLogin = document.getElementById("tab-login");
+const tabRegister = document.getElementById("tab-register");
+const loginForm = document.getElementById("login-form");
+const registerForm = document.getElementById("register-form");
+const logoutBtn = document.getElementById("logout-btn");
+const refreshProfileBtn = document.getElementById("refresh-profile");
+const registerProfileTextInput = document.getElementById("register-profile-text-input");
+const registerProfileLatexInput = document.getElementById("register-profile-latex-input");
+const registerProfilePdfInput = document.getElementById("register-profile-pdf-input");
 
 let token = localStorage.getItem("cv_tailor_token") || "";
-renderToken();
-
-function renderToken() {
-  tokenStatus.textContent = token ? "connecté" : "non connecté";
-}
+const latexByProfile = JSON.parse(localStorage.getItem("cv_tailor_latex_by_profile") || "{}");
+let defaultProfileId = null;
 
 function pretty(data) {
   return JSON.stringify(data, null, 2);
+}
+
+function latexToPlainText(latex) {
+  return String(latex || "")
+    .replace(/%.*$/gm, "")
+    .replace(/\\begin\{[^}]+\}/g, "")
+    .replace(/\\end\{[^}]+\}/g, "")
+    .replace(/\\[a-zA-Z]+\*?(\[[^\]]*\])?(\{([^}]*)\})?/g, "$3")
+    .replace(/&/g, " ")
+    .replace(/[{}]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function setDownloadLinks(docxPath = "", pdfPath = "") {
+  if (docxPath) {
+    docxLink.href = `/exports/docx?path=${encodeURIComponent(docxPath)}`;
+    docxLink.classList.remove("disabled");
+  } else {
+    docxLink.href = "#";
+    docxLink.classList.add("disabled");
+  }
+
+  if (pdfPath) {
+    pdfLink.href = `/exports/pdf?path=${encodeURIComponent(pdfPath)}`;
+    pdfLink.classList.remove("disabled");
+  } else {
+    pdfLink.href = "#";
+    pdfLink.classList.add("disabled");
+  }
+}
+
+function setRegisterProfileFormat(format) {
+  const isText = format === "text";
+  const isLatex = format === "latex";
+  const isPdf = format === "pdf";
+
+  registerProfileTextInput.classList.toggle("hidden", !isText);
+  registerProfileLatexInput.classList.toggle("hidden", !isLatex);
+  registerProfilePdfInput.classList.toggle("hidden", !isPdf);
+
+  registerProfileTextInput.required = isText;
+  registerProfileLatexInput.required = isLatex;
+}
+
+function switchAuthTab(tab) {
+  const loginActive = tab === "login";
+
+  tabLogin.classList.toggle("active", loginActive);
+  tabRegister.classList.toggle("active", !loginActive);
+  loginForm.classList.toggle("active", loginActive);
+  registerForm.classList.toggle("active", !loginActive);
+}
+
+function setAuthState(isConnected) {
+  authView.classList.toggle("active", !isConnected);
+  appView.classList.toggle("active", isConnected);
+  tokenStatus.textContent = isConnected ? "connecté" : "non connecté";
+  if (!isConnected) {
+    defaultProfileId = null;
+    compiledCvFrame.src = "about:blank";
+    compiledCvFrame.classList.add("hidden");
+    profilesOutput.textContent = "";
+  }
 }
 
 async function api(path, options = {}) {
@@ -43,83 +117,182 @@ async function api(path, options = {}) {
   return data;
 }
 
-document.getElementById("register-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const form = new FormData(e.currentTarget);
-  const payload = {
-    email: form.get("email"),
-    full_name: form.get("full_name"),
-    password: form.get("password"),
-  };
+async function loginUser(email, password) {
+  const data = await api("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  token = data.access_token;
+  localStorage.setItem("cv_tailor_token", token);
+  setAuthState(true);
+}
 
+async function loadDefaultProfile() {
+  const data = await api("/profiles/");
+  if (!Array.isArray(data) || data.length === 0) {
+    defaultProfileId = null;
+    compiledCvFrame.src = "about:blank";
+    compiledCvFrame.classList.add("hidden");
+    profilesOutput.textContent = "Aucun profil trouvé. Réinscris-toi pour créer ton profil master.";
+    return;
+  }
+
+  const profile = data[0];
+  defaultProfileId = profile.id;
+
+  if (profile.master_cv_latex) {
+    latexByProfile[String(profile.id)] = String(profile.master_cv_latex);
+    localStorage.setItem("cv_tailor_latex_by_profile", JSON.stringify(latexByProfile));
+  }
+
+  if (profile.master_cv_latex) {
+    try {
+      const compiled = await api(`/profiles/${profile.id}/compiled-pdf`);
+      compiledCvFrame.src = `/exports/pdf?path=${encodeURIComponent(compiled.pdf_path || "")}`;
+      compiledCvFrame.classList.remove("hidden");
+      profilesOutput.textContent = pretty({
+        id: profile.id,
+        title: profile.title,
+        github_username: profile.github_username,
+        latex_present: true,
+      });
+      return;
+    } catch (err) {
+      compiledCvFrame.src = "about:blank";
+      compiledCvFrame.classList.add("hidden");
+      profilesOutput.textContent = `Compilation PDF impossible: ${err.message}`;
+      return;
+    }
+  }
+
+  compiledCvFrame.src = "about:blank";
+  compiledCvFrame.classList.add("hidden");
+  profilesOutput.textContent = pretty({
+    id: profile.id,
+    title: profile.title,
+    github_username: profile.github_username,
+    cv_preview: String(profile.master_cv_text || "").slice(0, 1200),
+    latex_present: false,
+  });
+}
+
+switchAuthTab("login");
+setRegisterProfileFormat("text");
+setDownloadLinks("", "");
+setAuthState(Boolean(token));
+
+if (token) {
+  loadDefaultProfile().catch((err) => {
+    profilesOutput.textContent = err.message;
+  });
+}
+
+tabLogin.addEventListener("click", () => switchAuthTab("login"));
+tabRegister.addEventListener("click", () => switchAuthTab("register"));
+
+logoutBtn.addEventListener("click", () => {
+  token = "";
+  localStorage.removeItem("cv_tailor_token");
+  setAuthState(false);
+  setDownloadLinks("", "");
+});
+
+refreshProfileBtn.addEventListener("click", async () => {
   try {
-    const data = await api("/auth/register", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    alert(`Compte créé: ${data.email}`);
+    await loadDefaultProfile();
   } catch (err) {
-    alert(err.message);
+    profilesOutput.textContent = err.message;
   }
 });
 
-document.getElementById("login-form").addEventListener("submit", async (e) => {
+loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = new FormData(e.currentTarget);
-  const payload = {
-    email: form.get("email"),
-    password: form.get("password"),
-  };
 
   try {
-    const data = await api("/auth/login", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    token = data.access_token;
-    localStorage.setItem("cv_tailor_token", token);
-    renderToken();
+    await loginUser(form.get("email"), form.get("password"));
+    await loadDefaultProfile();
     alert("Connecté.");
   } catch (err) {
     alert(err.message);
   }
 });
 
-document.getElementById("profile-form").addEventListener("submit", async (e) => {
+registerForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = new FormData(e.currentTarget);
-  const payload = {
-    title: form.get("title"),
-    github_username: form.get("github_username"),
-    master_cv_text: form.get("master_cv_text"),
+
+  const registerPayload = {
+    email: form.get("email"),
+    full_name: form.get("full_name"),
+    password: form.get("password"),
   };
 
+  const registerFormat = form.get("register_profile_format");
+  if (registerFormat === "pdf") {
+    alert("Import PDF pas encore disponible. Choisis Texte ou LaTeX.");
+    return;
+  }
+
+  const latexSource = String(form.get("master_cv_latex") || "").trim();
+  const textSource = String(form.get("master_cv_text") || "").trim();
+  let masterCvText = "";
+
+  if (registerFormat === "latex") {
+    if (!latexSource) {
+      alert("Le CV master (LaTeX) est requis.");
+      return;
+    }
+    masterCvText = latexToPlainText(latexSource) || latexSource;
+  } else {
+    masterCvText = textSource;
+    if (!masterCvText) {
+      alert("Le CV master (texte) est requis.");
+      return;
+    }
+  }
+
   try {
-    const data = await api("/profiles/", {
+    await api("/auth/register", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(registerPayload),
     });
-    profilesOutput.textContent = pretty(data);
+
+    await loginUser(registerPayload.email, registerPayload.password);
+
+    const profilePayload = {
+      title: "Master CV",
+      master_cv_text: masterCvText,
+      master_cv_latex: registerFormat === "latex" ? latexSource : "",
+      github_username: String(form.get("github_username") || "").trim(),
+    };
+
+    const profile = await api("/profiles/", {
+      method: "POST",
+      body: JSON.stringify(profilePayload),
+    });
+
+    if (typeof profile.id !== "undefined") {
+      latexByProfile[String(profile.id)] = profilePayload.master_cv_latex || "";
+      localStorage.setItem("cv_tailor_latex_by_profile", JSON.stringify(latexByProfile));
+      defaultProfileId = profile.id;
+    }
+    await loadDefaultProfile();
+
+    alert("Compte créé, profil initial enregistré, et connexion réussie.");
   } catch (err) {
-    profilesOutput.textContent = err.message;
+    alert(err.message);
   }
 });
 
-document.getElementById("load-profiles").addEventListener("click", async () => {
-  try {
-    const data = await api("/profiles/");
-    profilesOutput.textContent = pretty(data);
-    if (Array.isArray(data) && data[0]) {
-      document.querySelector("input[name='profile_id']").value = data[0].id;
-    }
-  } catch (err) {
-    profilesOutput.textContent = err.message;
-  }
+document.querySelectorAll("input[name='register_profile_format']").forEach((input) => {
+  input.addEventListener("change", () => setRegisterProfileFormat(input.value));
 });
 
 document.getElementById("job-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = new FormData(e.currentTarget);
+
   const payload = {
     title: form.get("title"),
     source_url: form.get("source_url"),
@@ -152,11 +325,18 @@ document.getElementById("load-jobs").addEventListener("click", async () => {
 document.getElementById("tailor-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = new FormData(e.currentTarget);
+
+  if (!defaultProfileId) {
+    tailorOutput.textContent = "Aucun profil master trouvé pour ce compte.";
+    return;
+  }
+
   const payload = {
-    profile_id: Number(form.get("profile_id")),
+    profile_id: defaultProfileId,
     job_posting_id: Number(form.get("job_posting_id")),
     github_projects: [],
-    master_cv_latex: form.get("master_cv_latex") || "",
+    master_cv_latex: latexByProfile[String(defaultProfileId)] || "",
+    output_language: form.get("output_language") || "fr",
     use_llm: false,
   };
 
@@ -166,14 +346,9 @@ document.getElementById("tailor-form").addEventListener("submit", async (e) => {
       body: JSON.stringify(payload),
     });
     tailorOutput.textContent = pretty(data);
-
-    if (data.docx_path) {
-      docxLink.href = `/exports/docx?path=${encodeURIComponent(data.docx_path)}`;
-    }
-    if (data.pdf_path) {
-      pdfLink.href = `/exports/pdf?path=${encodeURIComponent(data.pdf_path)}`;
-    }
+    setDownloadLinks(data.docx_path || "", data.pdf_path || "");
   } catch (err) {
     tailorOutput.textContent = err.message;
+    setDownloadLinks("", "");
   }
 });

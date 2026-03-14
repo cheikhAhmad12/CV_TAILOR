@@ -4,6 +4,9 @@ from typing import List
 
 def normalize_text(text: str) -> str:
     text = text.replace("\r", "\n")
+    # Remove LaTeX separators/entities leaking into plain text extraction.
+    text = text.replace(r"\&", " and ")
+    text = text.replace("&", " ")
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"[ \t]+", " ", text)
     return text.strip()

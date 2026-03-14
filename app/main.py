@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from app.core.database import Base, engine
 from app.routers.auth import router as auth_router
@@ -24,6 +25,13 @@ app = FastAPI(
 )
 
 Base.metadata.create_all(bind=engine)
+with engine.begin() as conn:
+    conn.execute(
+        text(
+            "ALTER TABLE profiles "
+            "ADD COLUMN IF NOT EXISTS master_cv_latex TEXT NOT NULL DEFAULT ''"
+        )
+    )
 
 ui_dir = Path(__file__).resolve().parent / "ui"
 app.mount("/assets", StaticFiles(directory=ui_dir / "assets"), name="assets")
