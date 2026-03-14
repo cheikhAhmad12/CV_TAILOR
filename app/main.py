@@ -1,4 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.database import Base, engine
 from app.routers.auth import router as auth_router
@@ -21,6 +25,9 @@ app = FastAPI(
 
 Base.metadata.create_all(bind=engine)
 
+ui_dir = Path(__file__).resolve().parent / "ui"
+app.mount("/assets", StaticFiles(directory=ui_dir / "assets"), name="assets")
+
 app.include_router(auth_router)
 app.include_router(profiles_router)
 app.include_router(jobs_router)
@@ -33,3 +40,8 @@ app.include_router(exports_router)
 @app.get("/")
 def root():
     return {"message": "AI CV Tailor V3 backend running"}
+
+
+@app.get("/ui", include_in_schema=False)
+def ui():
+    return FileResponse(ui_dir / "index.html")

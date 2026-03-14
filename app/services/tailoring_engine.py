@@ -17,6 +17,7 @@ from app.services.resume_generator import (
 from app.services.scoring import compute_compatibility_score, compute_ats_score
 from app.services.github_service import fetch_github_projects
 from app.services.docx_exporter import export_resume_to_docx
+from app.services.latex_exporter import export_latex_to_pdf_with_tectonic
 
 
 def run_tailoring_engine(
@@ -25,6 +26,7 @@ def run_tailoring_engine(
     profile_id: int,
     job_posting_id: int,
     github_projects: list[GithubProject],
+    master_cv_latex: str = "",
 ) -> dict:
     profile = db.get(Profile, profile_id)
     if not profile or profile.user_id != current_user_id:
@@ -60,6 +62,12 @@ def run_tailoring_engine(
     compatibility_score = compute_compatibility_score(parsed_cv, parsed_job, selected_projects)
     ats_score = compute_ats_score(tailored_resume_markdown, parsed_job)
     docx_path = export_resume_to_docx(tailored_resume_markdown)
+    pdf_path = export_latex_to_pdf_with_tectonic(
+        master_cv_latex=master_cv_latex,
+        tailored_summary=tailored_summary,
+        tailored_experience_bullets=tailored_experience_bullets,
+        selected_projects=selected_projects,
+    )
 
     profile.parsed_summary_json = json.dumps(parsed_cv, ensure_ascii=False)
     job.parsed_json = json.dumps(parsed_job, ensure_ascii=False)
@@ -75,6 +83,7 @@ def run_tailoring_engine(
         ats_score=ats_score,
         selected_projects_json=json.dumps(selected_projects, ensure_ascii=False),
         docx_path=docx_path,
+        pdf_path=pdf_path,
     )
 
     db.add(application)
@@ -92,4 +101,5 @@ def run_tailoring_engine(
         "parsed_job_json": json.dumps(parsed_job, ensure_ascii=False),
         "parsed_profile_json": json.dumps(parsed_cv, ensure_ascii=False),
         "docx_path": docx_path,
+        "pdf_path": pdf_path,
     }

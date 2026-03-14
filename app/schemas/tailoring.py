@@ -8,6 +8,7 @@ class TailoringRunRequest(BaseModel):
     profile_id: int
     job_posting_id: int
     github_projects: List[GithubProject] = Field(default_factory=list)
+    master_cv_latex: str = ""
     use_llm: bool = False
 
 
@@ -33,3 +34,4 @@ class TailoringRunResponse(BaseModel):
     parsed_job_json: str
     parsed_profile_json: str
     docx_path: str = ""
+    pdf_path: str = ""

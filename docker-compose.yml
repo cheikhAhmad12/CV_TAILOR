@@ -5,13 +5,15 @@ services:
       POSTGRES_DB: cvtailor
       POSTGRES_USER: cvtailor
       POSTGRES_PASSWORD: cvtailor
-    ports:
-      - "5432:5432"
 
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: DOCKERFILE
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://cvtailor:cvtailor@postgres:5432/cvtailor
     ports:
       - "8000:8000"
     depends_on:
