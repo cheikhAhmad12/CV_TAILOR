@@ -28,14 +28,6 @@ def _append_tailored_block(
     output_language: str = "fr",
 ) -> str:
     lang = "en" if output_language == "en" else "fr"
-    summary = _escape_latex(tailored_summary)
-    bullets = "\n".join(
-        f"\\item {_escape_latex(item)}" for item in tailored_experience_bullets[:6]
-    ) or (
-        r"\item Tailored experience details unavailable."
-        if lang == "en"
-        else r"\item Details d'experience cibles indisponibles."
-    )
 
     project_lines = []
     for project in selected_projects[:4]:
@@ -56,23 +48,11 @@ def _append_tailored_block(
         else r"\item Aucun projet selectionne."
     )
 
-    title_tailored = "Tailored Version" if lang == "en" else "Version Ciblee"
-    title_summary = "Professional Summary" if lang == "en" else "Resume Professionnel"
-    title_exp = "Tailored Experience Highlights" if lang == "en" else "Experience Ciblee"
     title_proj = "Selected Projects" if lang == "en" else "Projets Selectionnes"
 
     tailored_block = f"""
 \\clearpage
-\\section*{{{title_tailored}}}
-\\subsection*{{{title_summary}}}
-{summary}
-
-\\subsection*{{{title_exp}}}
-\\begin{{itemize}}
-{bullets}
-\\end{{itemize}}
-
-\\subsection*{{{title_proj}}}
+\\section*{{{title_proj}}}
 \\begin{{itemize}}
 {projects}
 \\end{{itemize}}
@@ -210,33 +190,11 @@ def _inject_tailored_content_in_sections(
     source = master_cv_latex
     macro_style = "\\resumeSubHeadingListStart" in source and "\\resumeItem" in source
 
-    summary_body = _build_summary_body(tailored_summary, macro_style)
-    experience_body = _build_experience_body(
-        tailored_experience_bullets,
-        macro_style,
-        output_language=output_language,
-    )
     projects_body = _build_projects_body(
         selected_projects,
         macro_style,
         output_language=output_language,
     )
-
-    replaced_any = False
-
-    source, replaced = _replace_section_body(
-        source,
-        ("summary", "professional summary", "resume", "resume professionnel"),
-        summary_body,
-    )
-    replaced_any = replaced_any or replaced
-
-    source, replaced = _replace_section_body(
-        source,
-        ("professional experience", "experience", "work experience", "experience professionnelle"),
-        experience_body,
-    )
-    replaced_any = replaced_any or replaced
 
     source, replaced = _replace_section_body(
         source,
@@ -250,9 +208,7 @@ def _inject_tailored_content_in_sections(
         ),
         projects_body,
     )
-    replaced_any = replaced_any or replaced
-
-    if replaced_any:
+    if replaced:
         return source
 
     return _append_tailored_block(

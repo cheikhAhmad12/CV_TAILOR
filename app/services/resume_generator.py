@@ -121,7 +121,20 @@ def generate_resume_markdown(
             skills.append(kw)
     skills = skills[:12]
 
-    experience_lines = "\n".join(f"- {b}" for b in tailored_experience_bullets)
+    summary_text = (parsed_cv.get("summary") or "").strip() or tailored_summary
+    experience_lines_list = []
+    for exp in parsed_cv.get("experiences", []):
+        title = str(exp.get("title", "")).strip()
+        company = str(exp.get("company", "")).strip()
+        description = str(exp.get("description", "")).strip()
+        header = f"{title} at {company}" if company else title
+        line = f"{header} — {description}".strip(" —")
+        if line:
+            experience_lines_list.append(line)
+    if not experience_lines_list:
+        experience_lines_list = tailored_experience_bullets[:]
+
+    experience_lines = "\n".join(f"- {b}" for b in experience_lines_list)
     project_lines = "\n".join(
         f"- **{p['name']}** — {p['description'] or p['readme_summary'] or p['reason']}"
         for p in selected_projects
@@ -137,7 +150,7 @@ def generate_resume_markdown(
 {parsed_job['title']}
 
 ## Professional Summary
-{tailored_summary}
+{summary_text}
 
 ## Core Skills
 {", ".join(skills)}
@@ -158,7 +171,7 @@ def generate_resume_markdown(
 {parsed_job['title']}
 
 ## Resume professionnel
-{tailored_summary}
+{summary_text}
 
 ## Competences cles
 {", ".join(skills)}

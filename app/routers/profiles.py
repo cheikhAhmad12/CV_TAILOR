@@ -6,6 +6,7 @@ from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.profile import Profile
 from app.models.user import User
+from app.services.github_service import validate_github_username
 from app.services.latex_exporter import compile_master_latex_to_pdf
 from app.schemas.profile import ProfileCreate, ProfileUpdate, ProfileResponse
 
@@ -29,12 +30,21 @@ def create_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    github_username = (payload.github_username or "").strip()
+    if github_username:
+        try:
+            is_valid = validate_github_username(github_username)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not is_valid:
+            raise HTTPException(status_code=400, detail="GitHub username invalide")
+
     profile = Profile(
         user_id=current_user.id,
         title=payload.title,
         master_cv_text=payload.master_cv_text,
         master_cv_latex=payload.master_cv_latex,
-        github_username=payload.github_username,
+        github_username=github_username,
     )
     db.add(profile)
     db.commit()
@@ -98,6 +108,17 @@ def update_profile(
         raise HTTPException(status_code=404, detail="Profile not found")
 
     update_data = payload.model_dump(exclude_unset=True)
+    if "github_username" in update_data:
+        github_username = (update_data.get("github_username") or "").strip()
+        if github_username:
+            try:
+                is_valid = validate_github_username(github_username)
+            except RuntimeError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            if not is_valid:
+                raise HTTPException(status_code=400, detail="GitHub username invalide")
+        update_data["github_username"] = github_username
+
     for key, value in update_data.items():
         setattr(profile, key, value)
 

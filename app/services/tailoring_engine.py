@@ -8,6 +8,7 @@ from app.schemas.github import GithubProject
 from app.services.cv_parser import parse_cv
 from app.services.job_parser import parse_job_description
 from app.services.project_selector import rank_projects
+from app.services.llm_project_ranker import rerank_projects_with_llm
 from app.services.resume_generator import (
     generate_tailored_summary,
     generate_experience_bullets,
@@ -20,6 +21,27 @@ from app.services.docx_exporter import export_resume_to_docx
 from app.services.latex_exporter import export_latex_to_pdf_with_tectonic
 
 
+def _fallback_projects_from_cv(parsed_cv: dict) -> list[dict]:
+    fallback = []
+    for raw in parsed_cv.get("projects", [])[:3]:
+        name = str(raw).strip().split(" - ")[0].strip()
+        if not name:
+            name = "Project"
+        fallback.append(
+            {
+                "name": name[:120],
+                "score": 50.0,
+                "reason": "Extracted from CV projects section",
+                "description": str(raw)[:500],
+                "readme_summary": "",
+                "languages": [],
+                "topics": [],
+                "html_url": "",
+            }
+        )
+    return fallback
+
+
 def run_tailoring_engine(
     db: Session,
     current_user_id: int,
@@ -28,6 +50,7 @@ def run_tailoring_engine(
     github_projects: list[GithubProject],
     master_cv_latex: str = "",
     output_language: str = "fr",
+    use_llm: bool = False,
 ) -> dict:
     profile = db.get(Profile, profile_id)
     if not profile or profile.user_id != current_user_id:
@@ -47,7 +70,17 @@ def run_tailoring_engine(
         except Exception:
             projects_to_use = []
 
-    selected_projects = rank_projects(projects_to_use, parsed_job)
+    selected_projects = []
+    if use_llm and projects_to_use:
+        try:
+            selected_projects = rerank_projects_with_llm(projects_to_use, parsed_job, top_k=3)
+        except Exception:
+            selected_projects = []
+
+    if not selected_projects:
+        selected_projects = rank_projects(projects_to_use, parsed_job)
+    if not selected_projects:
+        selected_projects = _fallback_projects_from_cv(parsed_cv)
 
     tailored_summary = generate_tailored_summary(
         parsed_cv, parsed_job, selected_projects, output_language=output_language

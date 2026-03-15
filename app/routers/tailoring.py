@@ -26,6 +26,7 @@ def run_tailoring(
             github_projects=payload.github_projects,
             master_cv_latex=payload.master_cv_latex,
             output_language=payload.output_language,
+            use_llm=payload.use_llm,
         )
         return TailoringRunResponse(**result)
     except ValueError as e:

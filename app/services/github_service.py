@@ -8,6 +8,29 @@ from app.schemas.github import GithubProject
 GITHUB_API = "https://api.github.com"
 
 
+def validate_github_username(username: str) -> bool:
+    clean = (username or "").strip()
+    if not clean:
+        return True
+
+    url = f"{GITHUB_API}/users/{clean}"
+    try:
+        resp = requests.get(
+            url,
+            timeout=10,
+            headers={"Accept": "application/vnd.github+json"},
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"GitHub validation failed: {str(exc)}") from exc
+
+    if resp.status_code == 200:
+        return True
+    if resp.status_code == 404:
+        return False
+
+    raise RuntimeError(f"GitHub validation failed with status {resp.status_code}")
+
+
 def _get_readme_summary(full_name: str) -> str:
     url = f"{GITHUB_API}/repos/{full_name}/readme"
     resp = requests.get(

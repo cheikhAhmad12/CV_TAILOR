@@ -127,6 +127,15 @@ async function loginUser(email, password) {
   setAuthState(true);
 }
 
+async function verifyGithubUsername(username) {
+  const clean = String(username || "").trim();
+  if (!clean) {
+    return true;
+  }
+  const data = await api(`/github/validate?username=${encodeURIComponent(clean)}`);
+  return Boolean(data.valid);
+}
+
 async function loadDefaultProfile() {
   const data = await api("/profiles/");
   if (!Array.isArray(data) || data.length === 0) {
@@ -227,6 +236,7 @@ registerForm.addEventListener("submit", async (e) => {
     full_name: form.get("full_name"),
     password: form.get("password"),
   };
+  const githubUsername = String(form.get("github_username") || "").trim();
 
   const registerFormat = form.get("register_profile_format");
   if (registerFormat === "pdf") {
@@ -253,6 +263,14 @@ registerForm.addEventListener("submit", async (e) => {
   }
 
   try {
+    if (githubUsername) {
+      const isGithubValid = await verifyGithubUsername(githubUsername);
+      if (!isGithubValid) {
+        alert("Le username GitHub est invalide.");
+        return;
+      }
+    }
+
     await api("/auth/register", {
       method: "POST",
       body: JSON.stringify(registerPayload),
@@ -264,7 +282,7 @@ registerForm.addEventListener("submit", async (e) => {
       title: "Master CV",
       master_cv_text: masterCvText,
       master_cv_latex: registerFormat === "latex" ? latexSource : "",
-      github_username: String(form.get("github_username") || "").trim(),
+      github_username: githubUsername,
     };
 
     const profile = await api("/profiles/", {
@@ -337,7 +355,7 @@ document.getElementById("tailor-form").addEventListener("submit", async (e) => {
     github_projects: [],
     master_cv_latex: latexByProfile[String(defaultProfileId)] || "",
     output_language: form.get("output_language") || "fr",
-    use_llm: false,
+    use_llm: form.get("use_llm") === "on",
   };
 
   try {
