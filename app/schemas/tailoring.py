@@ -36,3 +36,4 @@ class TailoringRunResponse(BaseModel):
     parsed_profile_json: str
     docx_path: str = ""
     pdf_path: str = ""
+    cover_letter_path: str = ""

@@ -81,7 +81,7 @@
 
         <section class="card">
           <h2>1. Mon CV enregistré</h2>
-          <button id="refresh-profile" class="ghost">Rafraîchir mon CV</button>
+          <button id="refresh-profile" type="button" class="ghost">Rafraîchir mon CV</button>
           <iframe
             id="compiled-cv-frame"
             class="pdf-preview hidden"
@@ -110,16 +110,16 @@
               <label><input type="radio" name="output_language" value="fr" checked /> Sortie FR</label>
               <label><input type="radio" name="output_language" value="en" /> Output EN</label>
             </div>
-            <label><input type="checkbox" name="use_llm" /> Utiliser LLM pour classer les projets</label>
+            <label><input type="checkbox" name="use_llm" /> Utiliser LLM (ranking projets + lettre)</label>
             <button type="submit">Lancer tailoring</button>
           </form>
           <pre id="tailor-output" class="output"></pre>
-          <a id="docx-link" class="link" href="#" target="_blank" rel="noreferrer">Télécharger DOCX</a>
-          <a id="pdf-link" class="link" href="#" target="_blank" rel="noreferrer">Télécharger PDF</a>
+          <a id="cv-link" class="link" href="#" target="_blank" rel="noreferrer">Télécharger CV</a>
+          <a id="letter-link" class="link" href="#" target="_blank" rel="noreferrer">Télécharger Lettre</a>
         </section>
       </section>
     </main>
 
-    <script src="/assets/app.js"></script>
+    <script src="/assets/app.js?v=20260316a"></script>
   </body>
 </html>

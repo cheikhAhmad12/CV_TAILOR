@@ -19,6 +19,8 @@ from app.services.scoring import compute_compatibility_score, compute_ats_score
 from app.services.github_service import fetch_github_projects
 from app.services.docx_exporter import export_resume_to_docx
 from app.services.latex_exporter import export_latex_to_pdf_with_tectonic
+from app.services.letter_exporter import export_cover_letter_to_txt
+from app.services.llm_cover_letter import generate_cover_letter_with_llm
 
 
 def _fallback_projects_from_cv(parsed_cv: dict) -> list[dict]:
@@ -88,9 +90,19 @@ def run_tailoring_engine(
     tailored_experience_bullets = generate_experience_bullets(
         parsed_cv, parsed_job, output_language=output_language
     )
-    cover_letter = generate_cover_letter(
-        parsed_cv, parsed_job, selected_projects, output_language=output_language
-    )
+    if use_llm:
+        try:
+            cover_letter = generate_cover_letter_with_llm(
+                parsed_cv, parsed_job, selected_projects, output_language=output_language
+            )
+        except Exception:
+            cover_letter = generate_cover_letter(
+                parsed_cv, parsed_job, selected_projects, output_language=output_language
+            )
+    else:
+        cover_letter = generate_cover_letter(
+            parsed_cv, parsed_job, selected_projects, output_language=output_language
+        )
     tailored_resume_markdown = generate_resume_markdown(
         parsed_cv=parsed_cv,
         parsed_job=parsed_job,
@@ -103,6 +115,7 @@ def run_tailoring_engine(
     compatibility_score = compute_compatibility_score(parsed_cv, parsed_job, selected_projects)
     ats_score = compute_ats_score(tailored_resume_markdown, parsed_job)
     docx_path = export_resume_to_docx(tailored_resume_markdown)
+    cover_letter_path = export_cover_letter_to_txt(cover_letter)
     latex_source = (master_cv_latex or "").strip() or (profile.master_cv_latex or "").strip()
 
     pdf_path = export_latex_to_pdf_with_tectonic(
@@ -146,4 +159,5 @@ def run_tailoring_engine(
         "parsed_profile_json": json.dumps(parsed_cv, ensure_ascii=False),
         "docx_path": docx_path,
         "pdf_path": pdf_path,
+        "cover_letter_path": cover_letter_path,
     }

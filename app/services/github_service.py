@@ -6,6 +6,11 @@ from app.schemas.github import GithubProject
 
 
 GITHUB_API = "https://api.github.com"
+EXCLUDED_REPOS = {
+    "dynamicpricing",
+    "saphir_corse",
+    "thesis_m2",
+}
 
 
 def validate_github_username(username: str) -> bool:
@@ -70,6 +75,9 @@ def fetch_github_projects(username: str, max_repos: int = 8) -> List[GithubProje
 
     for repo in repos:
         if repo.get("fork"):
+            continue
+        repo_name = str(repo.get("name", "")).strip()
+        if repo_name.lower() in EXCLUDED_REPOS:
             continue
 
         full_name = repo["full_name"]

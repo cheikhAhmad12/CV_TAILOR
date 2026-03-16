@@ -248,6 +248,7 @@ def _escape_unescaped_ampersands(source: str) -> str:
     in_alignment_env = False
     alignment_envs = (
         "tabular",
+        "tabular*",
         "tabularx",
         "array",
         "align",

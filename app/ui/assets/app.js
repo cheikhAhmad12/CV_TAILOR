@@ -4,8 +4,8 @@ const tokenStatus = document.getElementById("token-status");
 const profilesOutput = document.getElementById("profiles-output");
 const jobsOutput = document.getElementById("jobs-output");
 const tailorOutput = document.getElementById("tailor-output");
-const docxLink = document.getElementById("docx-link");
-const pdfLink = document.getElementById("pdf-link");
+const cvLink = document.getElementById("cv-link") || document.getElementById("pdf-link");
+const letterLink = document.getElementById("letter-link") || document.getElementById("docx-link");
 const compiledCvFrame = document.getElementById("compiled-cv-frame");
 
 const tabLogin = document.getElementById("tab-login");
@@ -21,6 +21,7 @@ const registerProfilePdfInput = document.getElementById("register-profile-pdf-in
 let token = localStorage.getItem("cv_tailor_token") || "";
 const latexByProfile = JSON.parse(localStorage.getItem("cv_tailor_latex_by_profile") || "{}");
 let defaultProfileId = null;
+let compiledCvObjectUrl = "";
 
 function pretty(data) {
   return JSON.stringify(data, null, 2);
@@ -38,21 +39,25 @@ function latexToPlainText(latex) {
     .trim();
 }
 
-function setDownloadLinks(docxPath = "", pdfPath = "") {
-  if (docxPath) {
-    docxLink.href = `/exports/docx?path=${encodeURIComponent(docxPath)}`;
-    docxLink.classList.remove("disabled");
-  } else {
-    docxLink.href = "#";
-    docxLink.classList.add("disabled");
+function setDownloadLinks(pdfPath = "", letterPath = "") {
+  if (!cvLink || !letterLink) {
+    return;
   }
 
   if (pdfPath) {
-    pdfLink.href = `/exports/pdf?path=${encodeURIComponent(pdfPath)}`;
-    pdfLink.classList.remove("disabled");
+    cvLink.href = `/exports/pdf?path=${encodeURIComponent(pdfPath)}`;
+    cvLink.classList.remove("disabled");
   } else {
-    pdfLink.href = "#";
-    pdfLink.classList.add("disabled");
+    cvLink.href = "#";
+    cvLink.classList.add("disabled");
+  }
+
+  if (letterPath) {
+    letterLink.href = `/exports/letter?path=${encodeURIComponent(letterPath)}`;
+    letterLink.classList.remove("disabled");
+  } else {
+    letterLink.href = "#";
+    letterLink.classList.add("disabled");
   }
 }
 
@@ -79,15 +84,41 @@ function switchAuthTab(tab) {
 }
 
 function setAuthState(isConnected) {
+  if (!authView || !appView || !tokenStatus) {
+    return;
+  }
+
   authView.classList.toggle("active", !isConnected);
   appView.classList.toggle("active", isConnected);
   tokenStatus.textContent = isConnected ? "connecté" : "non connecté";
   if (!isConnected) {
     defaultProfileId = null;
+    if (compiledCvObjectUrl) {
+      URL.revokeObjectURL(compiledCvObjectUrl);
+      compiledCvObjectUrl = "";
+    }
     compiledCvFrame.src = "about:blank";
     compiledCvFrame.classList.add("hidden");
     profilesOutput.textContent = "";
   }
+}
+
+async function showCompiledPdf(pdfPath) {
+  if (compiledCvObjectUrl) {
+    URL.revokeObjectURL(compiledCvObjectUrl);
+    compiledCvObjectUrl = "";
+  }
+
+  const response = await fetch(`/exports/pdf-inline?path=${encodeURIComponent(pdfPath || "")}`);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Preview failed (${response.status}): ${text || "unknown error"}`);
+  }
+
+  const blob = await response.blob();
+  compiledCvObjectUrl = URL.createObjectURL(blob);
+  compiledCvFrame.src = `${compiledCvObjectUrl}#toolbar=1&navpanes=0`;
+  compiledCvFrame.classList.remove("hidden");
 }
 
 async function api(path, options = {}) {
@@ -111,6 +142,11 @@ async function api(path, options = {}) {
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      token = "";
+      localStorage.removeItem("cv_tailor_token");
+      setAuthState(false);
+    }
     throw new Error(`${response.status}: ${pretty(data)}`);
   }
 
@@ -140,6 +176,10 @@ async function loadDefaultProfile() {
   const data = await api("/profiles/");
   if (!Array.isArray(data) || data.length === 0) {
     defaultProfileId = null;
+    if (compiledCvObjectUrl) {
+      URL.revokeObjectURL(compiledCvObjectUrl);
+      compiledCvObjectUrl = "";
+    }
     compiledCvFrame.src = "about:blank";
     compiledCvFrame.classList.add("hidden");
     profilesOutput.textContent = "Aucun profil trouvé. Réinscris-toi pour créer ton profil master.";
@@ -157,8 +197,7 @@ async function loadDefaultProfile() {
   if (profile.master_cv_latex) {
     try {
       const compiled = await api(`/profiles/${profile.id}/compiled-pdf`);
-      compiledCvFrame.src = `/exports/pdf?path=${encodeURIComponent(compiled.pdf_path || "")}`;
-      compiledCvFrame.classList.remove("hidden");
+      await showCompiledPdf(compiled.pdf_path || "");
       profilesOutput.textContent = pretty({
         id: profile.id,
         title: profile.title,
@@ -167,6 +206,10 @@ async function loadDefaultProfile() {
       });
       return;
     } catch (err) {
+      if (compiledCvObjectUrl) {
+        URL.revokeObjectURL(compiledCvObjectUrl);
+        compiledCvObjectUrl = "";
+      }
       compiledCvFrame.src = "about:blank";
       compiledCvFrame.classList.add("hidden");
       profilesOutput.textContent = `Compilation PDF impossible: ${err.message}`;
@@ -174,6 +217,10 @@ async function loadDefaultProfile() {
     }
   }
 
+  if (compiledCvObjectUrl) {
+    URL.revokeObjectURL(compiledCvObjectUrl);
+    compiledCvObjectUrl = "";
+  }
   compiledCvFrame.src = "about:blank";
   compiledCvFrame.classList.add("hidden");
   profilesOutput.textContent = pretty({
@@ -364,7 +411,7 @@ document.getElementById("tailor-form").addEventListener("submit", async (e) => {
       body: JSON.stringify(payload),
     });
     tailorOutput.textContent = pretty(data);
-    setDownloadLinks(data.docx_path || "", data.pdf_path || "");
+    setDownloadLinks(data.pdf_path || "", data.cover_letter_path || "");
   } catch (err) {
     tailorOutput.textContent = err.message;
     setDownloadLinks("", "");

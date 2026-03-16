@@ -277,6 +277,27 @@ def rerank_projects_with_llm(
             break
 
     if ranked:
+        # Ensure we always return up to top_k by backfilling with vector ranking
+        # when LLM returns fewer items.
+        if len(ranked) < top_k:
+            for project, sim in scored:
+                if project.name in seen:
+                    continue
+                ranked.append(
+                    {
+                        "name": project.name,
+                        "score": round(max(0.0, min(100.0, sim * 100.0)), 2),
+                        "reason": f"Vector similarity backfill (similarity={sim:.3f})",
+                        "description": project.description or "",
+                        "readme_summary": project.readme_summary or "",
+                        "languages": project.languages or [],
+                        "topics": project.topics or [],
+                        "html_url": project.html_url or "",
+                    }
+                )
+                seen.add(project.name)
+                if len(ranked) >= top_k:
+                    break
         return ranked
 
     return vector_only_output("Vector similarity ranking (LLM empty output)")
