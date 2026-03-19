@@ -62,6 +62,34 @@
               <input type="file" name="master_cv_pdf" accept="application/pdf" />
               <p class="hint">Import PDF bientôt disponible. Pour l’instant: utilise Texte ou LaTeX.</p>
             </div>
+            <div class="stack">
+              <label><input type="checkbox" id="register-letter-enabled" name="register_letter_enabled" /> Ajouter une lettre de motivation</label>
+            </div>
+            <div id="register-letter-fields" class="hidden stack">
+              <div class="format-switch">
+                <label><input type="radio" name="register_letter_format" value="text" checked /> Texte</label>
+                <label><input type="radio" name="register_letter_format" value="latex" /> LaTeX</label>
+                <label><input type="radio" name="register_letter_format" value="pdf" /> PDF</label>
+              </div>
+              <textarea
+                id="register-letter-text-input"
+                name="master_cover_letter_text"
+                rows="8"
+                class="hidden"
+                placeholder="Colle ici ta lettre de motivation (texte)"
+              ></textarea>
+              <textarea
+                id="register-letter-latex-input"
+                name="master_cover_letter_latex"
+                rows="8"
+                class="hidden"
+                placeholder="Colle ici ta lettre de motivation (LaTeX)"
+              ></textarea>
+              <div id="register-letter-pdf-input" class="hidden stack">
+                <input type="file" name="master_cover_letter_pdf" accept="application/pdf" />
+                <p class="hint">Import PDF bientôt disponible. Pour l’instant: utilise Texte ou LaTeX.</p>
+              </div>
+            </div>
             <button type="submit">Créer mon compte</button>
           </form>
         </section>
@@ -120,6 +148,6 @@
       </section>
     </main>
 
-    <script src="/assets/app.js?v=20260316a"></script>
+    <script src="/assets/app.js?v=20260319a"></script>
   </body>
 </html>

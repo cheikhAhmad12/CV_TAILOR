@@ -32,6 +32,18 @@ with engine.begin() as conn:
             "ADD COLUMN IF NOT EXISTS master_cv_latex TEXT NOT NULL DEFAULT ''"
         )
     )
+    conn.execute(
+        text(
+            "ALTER TABLE profiles "
+            "ADD COLUMN IF NOT EXISTS master_cover_letter_text TEXT NOT NULL DEFAULT ''"
+        )
+    )
+    conn.execute(
+        text(
+            "ALTER TABLE profiles "
+            "ADD COLUMN IF NOT EXISTS master_cover_letter_latex TEXT NOT NULL DEFAULT ''"
+        )
+    )
 
 ui_dir = Path(__file__).resolve().parent / "ui"
 app.mount("/assets", StaticFiles(directory=ui_dir / "assets"), name="assets")

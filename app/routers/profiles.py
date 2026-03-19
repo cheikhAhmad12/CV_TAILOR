@@ -44,6 +44,8 @@ def create_profile(
         title=payload.title,
         master_cv_text=payload.master_cv_text,
         master_cv_latex=payload.master_cv_latex,
+        master_cover_letter_text=payload.master_cover_letter_text,
+        master_cover_letter_latex=payload.master_cover_letter_latex,
         github_username=github_username,
     )
     db.add(profile)

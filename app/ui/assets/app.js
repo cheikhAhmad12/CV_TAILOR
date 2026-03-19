@@ -17,6 +17,11 @@ const refreshProfileBtn = document.getElementById("refresh-profile");
 const registerProfileTextInput = document.getElementById("register-profile-text-input");
 const registerProfileLatexInput = document.getElementById("register-profile-latex-input");
 const registerProfilePdfInput = document.getElementById("register-profile-pdf-input");
+const registerLetterEnabledInput = document.getElementById("register-letter-enabled");
+const registerLetterFields = document.getElementById("register-letter-fields");
+const registerLetterTextInput = document.getElementById("register-letter-text-input");
+const registerLetterLatexInput = document.getElementById("register-letter-latex-input");
+const registerLetterPdfInput = document.getElementById("register-letter-pdf-input");
 
 let token = localStorage.getItem("cv_tailor_token") || "";
 const latexByProfile = JSON.parse(localStorage.getItem("cv_tailor_latex_by_profile") || "{}");
@@ -72,6 +77,56 @@ function setRegisterProfileFormat(format) {
 
   registerProfileTextInput.required = isText;
   registerProfileLatexInput.required = isLatex;
+}
+
+function setRegisterLetterFormat(format, enabled) {
+  const isActive = Boolean(enabled);
+  const isText = isActive && format === "text";
+  const isLatex = isActive && format === "latex";
+  const isPdf = isActive && format === "pdf";
+
+  registerLetterFields.classList.toggle("hidden", !isActive);
+  registerLetterTextInput.classList.toggle("hidden", !isText);
+  registerLetterLatexInput.classList.toggle("hidden", !isLatex);
+  registerLetterPdfInput.classList.toggle("hidden", !isPdf);
+
+  registerLetterTextInput.required = isText;
+  registerLetterLatexInput.required = isLatex;
+}
+
+function extractOptionalDocument(form, options) {
+  const enabled = options.enabled;
+  const format = options.format;
+  const textField = options.textField;
+  const latexField = options.latexField;
+  const label = options.label;
+
+  if (!enabled) {
+    return { text: "", latex: "" };
+  }
+
+  if (format === "pdf") {
+    throw new Error(`Import PDF pas encore disponible pour ${label}. Choisis Texte ou LaTeX.`);
+  }
+
+  const latexSource = String(form.get(latexField) || "").trim();
+  const textSource = String(form.get(textField) || "").trim();
+
+  if (format === "latex") {
+    if (!latexSource) {
+      throw new Error(`${label} (LaTeX) requis.`);
+    }
+    return {
+      text: latexToPlainText(latexSource) || latexSource,
+      latex: latexSource,
+    };
+  }
+
+  if (!textSource) {
+    throw new Error(`${label} (texte) requis.`);
+  }
+
+  return { text: textSource, latex: "" };
 }
 
 function switchAuthTab(tab) {
@@ -203,6 +258,7 @@ async function loadDefaultProfile() {
         title: profile.title,
         github_username: profile.github_username,
         latex_present: true,
+        cover_letter_present: Boolean(profile.master_cover_letter_text || profile.master_cover_letter_latex),
       });
       return;
     } catch (err) {
@@ -229,11 +285,13 @@ async function loadDefaultProfile() {
     github_username: profile.github_username,
     cv_preview: String(profile.master_cv_text || "").slice(0, 1200),
     latex_present: false,
+    cover_letter_present: Boolean(profile.master_cover_letter_text || profile.master_cover_letter_latex),
   });
 }
 
 switchAuthTab("login");
 setRegisterProfileFormat("text");
+setRegisterLetterFormat("text", false);
 setDownloadLinks("", "");
 setAuthState(Boolean(token));
 
@@ -286,30 +344,25 @@ registerForm.addEventListener("submit", async (e) => {
   const githubUsername = String(form.get("github_username") || "").trim();
 
   const registerFormat = form.get("register_profile_format");
-  if (registerFormat === "pdf") {
-    alert("Import PDF pas encore disponible. Choisis Texte ou LaTeX.");
-    return;
-  }
-
-  const latexSource = String(form.get("master_cv_latex") || "").trim();
-  const textSource = String(form.get("master_cv_text") || "").trim();
-  let masterCvText = "";
-
-  if (registerFormat === "latex") {
-    if (!latexSource) {
-      alert("Le CV master (LaTeX) est requis.");
-      return;
-    }
-    masterCvText = latexToPlainText(latexSource) || latexSource;
-  } else {
-    masterCvText = textSource;
-    if (!masterCvText) {
-      alert("Le CV master (texte) est requis.");
-      return;
-    }
-  }
+  const letterEnabled = form.get("register_letter_enabled") === "on";
+  const letterFormat = form.get("register_letter_format") || "text";
 
   try {
+    const cvDocument = extractOptionalDocument(form, {
+      enabled: true,
+      format: registerFormat,
+      textField: "master_cv_text",
+      latexField: "master_cv_latex",
+      label: "Le CV master",
+    });
+    const letterDocument = extractOptionalDocument(form, {
+      enabled: letterEnabled,
+      format: letterFormat,
+      textField: "master_cover_letter_text",
+      latexField: "master_cover_letter_latex",
+      label: "La lettre de motivation",
+    });
+
     if (githubUsername) {
       const isGithubValid = await verifyGithubUsername(githubUsername);
       if (!isGithubValid) {
@@ -327,8 +380,10 @@ registerForm.addEventListener("submit", async (e) => {
 
     const profilePayload = {
       title: "Master CV",
-      master_cv_text: masterCvText,
-      master_cv_latex: registerFormat === "latex" ? latexSource : "",
+      master_cv_text: cvDocument.text,
+      master_cv_latex: cvDocument.latex,
+      master_cover_letter_text: letterDocument.text,
+      master_cover_letter_latex: letterDocument.latex,
       github_username: githubUsername,
     };
 
@@ -352,6 +407,17 @@ registerForm.addEventListener("submit", async (e) => {
 
 document.querySelectorAll("input[name='register_profile_format']").forEach((input) => {
   input.addEventListener("change", () => setRegisterProfileFormat(input.value));
+});
+
+registerLetterEnabledInput.addEventListener("change", () => {
+  const selectedFormat = document.querySelector("input[name='register_letter_format']:checked")?.value || "text";
+  setRegisterLetterFormat(selectedFormat, registerLetterEnabledInput.checked);
+});
+
+document.querySelectorAll("input[name='register_letter_format']").forEach((input) => {
+  input.addEventListener("change", () => {
+    setRegisterLetterFormat(input.value, registerLetterEnabledInput.checked);
+  });
 });
 
 document.getElementById("job-form").addEventListener("submit", async (e) => {
