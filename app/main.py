@@ -13,6 +13,7 @@ from app.routers.applications import router as applications_router
 from app.routers.tailoring import router as tailoring_router
 from app.routers.github import router as github_router
 from app.routers.exports import router as exports_router
+from app.routers.thesis_discovery import router as thesis_discovery_router
 
 from app.models.user import User
 from app.models.profile import Profile
@@ -55,6 +56,7 @@ app.include_router(applications_router)
 app.include_router(tailoring_router)
 app.include_router(github_router)
 app.include_router(exports_router)
+app.include_router(thesis_discovery_router)
 
 
 @app.get("/")
