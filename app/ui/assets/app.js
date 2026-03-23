@@ -3,6 +3,8 @@ const appView = document.getElementById("app-view");
 const tokenStatus = document.getElementById("token-status");
 const profilesOutput = document.getElementById("profiles-output");
 const jobsOutput = document.getElementById("jobs-output");
+const jobsPanel = document.getElementById("jobs-panel");
+const toggleJobsOutputBtn = document.getElementById("toggle-jobs-output");
 const thesisOutput = document.getElementById("thesis-output");
 const thesisResults = document.getElementById("thesis-results");
 const tailorOutput = document.getElementById("tailor-output");
@@ -33,6 +35,15 @@ let latestThesisOffers = [];
 
 function pretty(data) {
   return JSON.stringify(data, null, 2);
+}
+
+function setJobsPanelOpen(isOpen) {
+  if (!jobsPanel || !toggleJobsOutputBtn) {
+    return;
+  }
+
+  jobsPanel.classList.toggle("hidden", !isOpen);
+  toggleJobsOutputBtn.textContent = isOpen ? "Masquer mes jobs" : "Afficher mes jobs";
 }
 
 function escapeHtml(value) {
@@ -417,6 +428,7 @@ switchAuthTab("login");
 setRegisterProfileFormat("text");
 setRegisterLetterFormat("text", false);
 setDownloadLinks("", "");
+setJobsPanelOpen(false);
 setAuthState(Boolean(token));
 
 if (token) {
@@ -570,12 +582,19 @@ document.getElementById("load-jobs").addEventListener("click", async () => {
   try {
     const data = await api("/jobs/");
     jobsOutput.textContent = pretty(data);
+    setJobsPanelOpen(true);
     if (Array.isArray(data) && data[0]) {
       document.querySelector("input[name='job_posting_id']").value = data[0].id;
     }
   } catch (err) {
     jobsOutput.textContent = err.message;
+    setJobsPanelOpen(true);
   }
+});
+
+toggleJobsOutputBtn.addEventListener("click", () => {
+  const isHidden = jobsPanel ? jobsPanel.classList.contains("hidden") : true;
+  setJobsPanelOpen(isHidden);
 });
 
 document.getElementById("thesis-search-form").addEventListener("submit", async (e) => {

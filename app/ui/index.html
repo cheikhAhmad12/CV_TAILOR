@@ -126,8 +126,13 @@
             <textarea name="raw_text" rows="8" placeholder="Description du job" required></textarea>
             <button type="submit">Créer job</button>
           </form>
-          <button id="load-jobs" class="ghost">Charger mes jobs</button>
-          <pre id="jobs-output" class="output"></pre>
+          <div class="section-actions">
+            <button id="load-jobs" class="ghost" type="button">Charger mes jobs</button>
+            <button id="toggle-jobs-output" class="ghost" type="button">Afficher mes jobs</button>
+          </div>
+          <div id="jobs-panel" class="scroll-panel hidden">
+            <pre id="jobs-output" class="output output-tall"></pre>
+          </div>
         </section>
 
         <section class="card">

@@ -97,6 +97,12 @@ body {
   gap: 10px;
 }
 
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .tabs {
   display: flex;
   gap: 8px;
@@ -205,6 +211,16 @@ button.ghost:active {
   max-height: 220px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.output-tall {
+  min-height: 140px;
+  max-height: 360px;
+}
+
+.scroll-panel {
+  max-height: 380px;
+  overflow: auto;
 }
 
 .pdf-preview {
