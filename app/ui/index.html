@@ -159,6 +159,30 @@
 
         <section class="card">
           <h2>4. Tailoring</h2>
+          <div class="section-actions">
+            <button id="load-sources" type="button" class="ghost">Charger mes sources</button>
+          </div>
+          <form id="source-form" class="stack">
+            <input name="name" type="text" placeholder="Nom de la source" required />
+            <input name="base_url" type="url" placeholder="URL de base (optionnel)" />
+            <button type="submit">Ajouter une source</button>
+          </form>
+          <pre id="sources-output" class="output"></pre>
+          <div id="sources-list" class="results-list hidden"></div>
+          <div id="source-chat-panel" class="chat-panel hidden">
+            <div class="chat-header">
+              <strong id="source-chat-title">Assistant source</strong>
+            </div>
+            <div id="source-chat-messages" class="chat-messages"></div>
+            <form id="source-chat-form" class="stack">
+              <textarea name="content" rows="3" placeholder="Ex: inspecte cette URL https://..." required></textarea>
+              <button type="submit">Envoyer</button>
+            </form>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>5. Tailoring</h2>
           <form id="tailor-form" class="stack">
             <input name="job_posting_id" type="number" min="1" placeholder="job_posting_id" required />
             <div class="format-switch">
@@ -175,6 +199,6 @@
       </section>
     </main>
 
-    <script src="/assets/app.js?v=20260323b"></script>
+    <script src="/assets/app.js?v=20260323d"></script>
   </body>
 </html>

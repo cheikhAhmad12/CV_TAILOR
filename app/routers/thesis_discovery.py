@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
+from app.models.applied_thesis_offer import AppliedThesisOffer
 from app.models.job import JobPosting
 from app.models.profile import Profile
 from app.models.user import User
 from app.schemas.thesis_discovery import (
+    AppliedThesisOfferCreateRequest,
+    AppliedThesisOfferResponse,
     ThesisDiscoveryImportRequest,
     ThesisDiscoveryImportResponse,
     ThesisDiscoverySearchRequest,
@@ -66,9 +70,20 @@ def search_thesis_offers(
             detail=f"Thesis discovery failed: {str(exc)}",
         ) from exc
 
+    applied_offer_keys = {
+        (row.source, row.source_offer_id)
+        for row in db.scalars(
+            select(AppliedThesisOffer).where(AppliedThesisOffer.user_id == current_user.id)
+        ).all()
+    }
+
     ranked: list[dict] = []
     for offer, score, reason in score_thesis_offers(collected, intent):
-        ranked.append(normalize_thesis_offer(offer, score, reason))
+        normalized = normalize_thesis_offer(offer, score, reason)
+        offer_key = (normalized.get("source", ""), normalized.get("source_id", ""))
+        if offer_key in applied_offer_keys:
+            continue
+        ranked.append(normalized)
 
     ranked.sort(key=lambda item: item["match_score"], reverse=True)
     return ThesisDiscoverySearchResponse(
@@ -98,3 +113,32 @@ def import_thesis_offer(
         source_url=job.source_url,
         raw_text=job.raw_text,
     )
+
+
+@router.post("/applied", response_model=AppliedThesisOfferResponse, status_code=status.HTTP_201_CREATED)
+def mark_thesis_offer_as_applied(
+    payload: AppliedThesisOfferCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    existing = db.scalar(
+        select(AppliedThesisOffer).where(
+            AppliedThesisOffer.user_id == current_user.id,
+            AppliedThesisOffer.source == payload.source,
+            AppliedThesisOffer.source_offer_id == payload.source_id,
+        )
+    )
+    if existing:
+        return existing
+
+    applied = AppliedThesisOffer(
+        user_id=current_user.id,
+        source=payload.source,
+        source_offer_id=payload.source_id,
+        title=payload.title,
+        detail_url=payload.detail_url,
+    )
+    db.add(applied)
+    db.commit()
+    db.refresh(applied)
+    return applied

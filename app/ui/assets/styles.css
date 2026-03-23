@@ -287,6 +287,19 @@ button.ghost:active {
   gap: 8px;
 }
 
+.check-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.check-action input {
+  width: auto;
+  margin: 0;
+}
+
 .meta-chip {
   border-radius: 999px;
   padding: 5px 9px;
@@ -299,6 +312,56 @@ button.ghost:active {
 .result-reason {
   margin: 0;
   color: var(--text);
+}
+
+.chat-panel {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+}
+
+.chat-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #f4faf8;
+}
+
+.chat-messages {
+  max-height: 320px;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: linear-gradient(180deg, #fbfdfc, #f3f8f6);
+}
+
+.chat-message {
+  max-width: 88%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.chat-message strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.chat-message p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.chat-user {
+  margin-left: auto;
+  background: #eaf7f3;
+}
+
+.chat-assistant {
+  margin-right: auto;
 }
 
 .link {

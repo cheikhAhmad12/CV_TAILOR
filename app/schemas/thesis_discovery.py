@@ -34,6 +34,24 @@ class ThesisDiscoverySearchResponse(BaseModel):
     offers: list[ThesisOffer]
 
 
+class AppliedThesisOfferCreateRequest(BaseModel):
+    source: str
+    source_id: str
+    title: str = ""
+    detail_url: str = ""
+
+
+class AppliedThesisOfferResponse(BaseModel):
+    id: int
+    source: str
+    source_offer_id: str
+    title: str
+    detail_url: str
+
+    class Config:
+        from_attributes = True
+
+
 class ThesisDiscoveryImportRequest(BaseModel):
     title: str
     source_url: str = ""

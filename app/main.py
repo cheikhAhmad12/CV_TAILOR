@@ -14,11 +14,16 @@ from app.routers.tailoring import router as tailoring_router
 from app.routers.github import router as github_router
 from app.routers.exports import router as exports_router
 from app.routers.thesis_discovery import router as thesis_discovery_router
+from app.routers.source_agent import router as source_agent_router, sources_router as thesis_sources_router
 
 from app.models.user import User
 from app.models.profile import Profile
 from app.models.job import JobPosting
 from app.models.application import ApplicationVersion
+from app.models.applied_thesis_offer import AppliedThesisOffer
+from app.models.thesis_source import ThesisSource
+from app.models.source_agent_session import SourceAgentSession
+from app.models.source_agent_message import SourceAgentMessage
 
 app = FastAPI(
     title="AI CV Tailor V3 Backend",
@@ -57,6 +62,8 @@ app.include_router(tailoring_router)
 app.include_router(github_router)
 app.include_router(exports_router)
 app.include_router(thesis_discovery_router)
+app.include_router(thesis_sources_router)
+app.include_router(source_agent_router)
 
 
 @app.get("/")

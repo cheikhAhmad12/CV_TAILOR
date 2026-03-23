@@ -8,6 +8,11 @@ const toggleJobsOutputBtn = document.getElementById("toggle-jobs-output");
 const thesisOutput = document.getElementById("thesis-output");
 const thesisResultsPanel = document.getElementById("thesis-results-panel");
 const thesisResults = document.getElementById("thesis-results");
+const sourcesOutput = document.getElementById("sources-output");
+const sourcesList = document.getElementById("sources-list");
+const sourceChatPanel = document.getElementById("source-chat-panel");
+const sourceChatTitle = document.getElementById("source-chat-title");
+const sourceChatMessages = document.getElementById("source-chat-messages");
 const tailorOutput = document.getElementById("tailor-output");
 const cvLink = document.getElementById("cv-link") || document.getElementById("pdf-link");
 const letterLink = document.getElementById("letter-link") || document.getElementById("docx-link");
@@ -33,6 +38,8 @@ const latexByProfile = JSON.parse(localStorage.getItem("cv_tailor_latex_by_profi
 let defaultProfileId = null;
 let compiledCvObjectUrl = "";
 let latestThesisOffers = [];
+let latestSources = [];
+let activeSourceSessionId = null;
 
 function pretty(data) {
   return JSON.stringify(data, null, 2);
@@ -45,6 +52,83 @@ function setJobsPanelOpen(isOpen) {
 
   jobsPanel.classList.toggle("hidden", !isOpen);
   toggleJobsOutputBtn.textContent = isOpen ? "Masquer mes jobs" : "Afficher mes jobs";
+}
+
+function renderSourceChatMessages(messages) {
+  if (!sourceChatMessages) {
+    return;
+  }
+  sourceChatMessages.innerHTML = (messages || [])
+    .map((message) => {
+      const roleClass = message.role === "user" ? "chat-user" : "chat-assistant";
+      const roleLabel = message.role === "user" ? "Vous" : "Assistant";
+      return `
+        <article class="chat-message ${roleClass}">
+          <strong>${roleLabel}</strong>
+          <p>${escapeHtml(message.content || "")}</p>
+        </article>
+      `;
+    })
+    .join("");
+  sourceChatMessages.scrollTop = sourceChatMessages.scrollHeight;
+}
+
+function renderSources(sources) {
+  latestSources = Array.isArray(sources) ? sources : [];
+  if (!sourcesList) {
+    return;
+  }
+  if (!latestSources.length) {
+    sourcesList.innerHTML = "";
+    sourcesList.classList.add("hidden");
+    return;
+  }
+
+  sourcesList.innerHTML = latestSources
+    .map((source) => `
+      <article class="result-card">
+        <div class="result-head">
+          <div>
+            <h3 class="result-title">${escapeHtml(source.name || "Source")}</h3>
+            <p class="result-reason">${escapeHtml(source.base_url || "")}</p>
+          </div>
+          <span class="score-pill">${escapeHtml(source.status || "draft")}</span>
+        </div>
+        <div class="result-meta">
+          <span class="meta-chip">${escapeHtml(source.strategy || "unknown")}</span>
+          <span class="meta-chip">${source.requires_auth ? "auth" : "public"}</span>
+        </div>
+        <div class="result-actions">
+          <button type="button" class="ghost open-source-chat-btn" data-source-id="${source.id}">Ouvrir le chat</button>
+        </div>
+      </article>
+    `)
+    .join("");
+  sourcesList.classList.remove("hidden");
+
+  sourcesList.querySelectorAll(".open-source-chat-btn").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const sourceId = Number(button.dataset.sourceId);
+      const source = latestSources.find((item) => item.id === sourceId);
+      if (!source) {
+        return;
+      }
+      try {
+        const session = await api("/source-agent/sessions", {
+          method: "POST",
+          body: JSON.stringify({ source_id: sourceId }),
+        });
+        activeSourceSessionId = session.id;
+        if (sourceChatTitle) {
+          sourceChatTitle.textContent = `Assistant source - ${source.name}`;
+        }
+        renderSourceChatMessages(session.messages || []);
+        sourceChatPanel.classList.remove("hidden");
+      } catch (err) {
+        sourcesOutput.textContent = err.message;
+      }
+    });
+  });
 }
 
 function escapeHtml(value) {
@@ -156,6 +240,10 @@ function renderThesisResults(offers) {
                 : ""
             }
             <button type="button" class="ghost thesis-import-btn" data-offer-index="${index}">Importer comme job</button>
+            <label class="check-action">
+              <input type="checkbox" class="thesis-applied-checkbox" data-offer-index="${index}" />
+              Deja postule
+            </label>
           </div>
         </article>
       `;
@@ -193,6 +281,41 @@ function renderThesisResults(offers) {
         thesisOutput.textContent = err.message;
       } finally {
         button.disabled = false;
+      }
+    });
+  });
+
+  thesisResults.querySelectorAll(".thesis-applied-checkbox").forEach((input) => {
+    input.addEventListener("change", async () => {
+      if (!input.checked) {
+        return;
+      }
+
+      const offerIndex = Number(input.dataset.offerIndex);
+      const offer = latestThesisOffers[offerIndex];
+      if (!offer) {
+        input.checked = false;
+        return;
+      }
+
+      input.disabled = true;
+      try {
+        await api("/thesis-discovery/applied", {
+          method: "POST",
+          body: JSON.stringify({
+            source: offer.source,
+            source_id: offer.source_id,
+            title: offer.title,
+            detail_url: offer.detail_url || offer.application_url || "",
+          }),
+        });
+        latestThesisOffers = latestThesisOffers.filter((_, idx) => idx !== offerIndex);
+        thesisOutput.textContent = `Offre masquee pour les prochaines recherches: ${offer.title}`;
+        renderThesisResults(latestThesisOffers);
+      } catch (err) {
+        input.checked = false;
+        input.disabled = false;
+        thesisOutput.textContent = err.message;
       }
     });
   });
@@ -281,6 +404,8 @@ function setAuthState(isConnected) {
   if (!isConnected) {
     defaultProfileId = null;
     latestThesisOffers = [];
+    latestSources = [];
+    activeSourceSessionId = null;
     if (compiledCvObjectUrl) {
       URL.revokeObjectURL(compiledCvObjectUrl);
       compiledCvObjectUrl = "";
@@ -296,6 +421,16 @@ function setAuthState(isConnected) {
     }
     if (thesisResultsPanel) {
       thesisResultsPanel.classList.add("hidden");
+    }
+    if (sourcesOutput) {
+      sourcesOutput.textContent = "";
+    }
+    if (sourcesList) {
+      sourcesList.innerHTML = "";
+      sourcesList.classList.add("hidden");
+    }
+    if (sourceChatPanel) {
+      sourceChatPanel.classList.add("hidden");
     }
   }
 }
@@ -431,6 +566,14 @@ async function loadDefaultProfile() {
   });
 }
 
+async function loadSources() {
+  const data = await api("/thesis-sources/");
+  sourcesOutput.textContent = pretty({
+    source_count: Array.isArray(data) ? data.length : 0,
+  });
+  renderSources(data || []);
+}
+
 switchAuthTab("login");
 setRegisterProfileFormat("text");
 setRegisterLetterFormat("text", false);
@@ -441,6 +584,9 @@ setAuthState(Boolean(token));
 if (token) {
   loadDefaultProfile().catch((err) => {
     profilesOutput.textContent = err.message;
+  });
+  loadSources().catch((err) => {
+    sourcesOutput.textContent = err.message;
   });
 }
 
@@ -638,6 +784,55 @@ document.getElementById("thesis-search-form").addEventListener("submit", async (
   } catch (err) {
     thesisOutput.textContent = err.message;
     renderThesisResults([]);
+  }
+});
+
+document.getElementById("load-sources").addEventListener("click", async () => {
+  try {
+    await loadSources();
+  } catch (err) {
+    sourcesOutput.textContent = err.message;
+  }
+});
+
+document.getElementById("source-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = new FormData(e.currentTarget);
+  try {
+    const created = await api("/thesis-sources/", {
+      method: "POST",
+      body: JSON.stringify({
+        name: String(form.get("name") || "").trim(),
+        base_url: String(form.get("base_url") || "").trim(),
+      }),
+    });
+    sourcesOutput.textContent = pretty(created);
+    e.currentTarget.reset();
+    await loadSources();
+  } catch (err) {
+    sourcesOutput.textContent = err.message;
+  }
+});
+
+document.getElementById("source-chat-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!activeSourceSessionId) {
+    sourcesOutput.textContent = "Ouvre d'abord une session de chat pour une source.";
+    return;
+  }
+  const form = new FormData(e.currentTarget);
+  try {
+    const session = await api(`/source-agent/sessions/${activeSourceSessionId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({
+        content: String(form.get("content") || "").trim(),
+      }),
+    });
+    renderSourceChatMessages(session.messages || []);
+    e.currentTarget.reset();
+    await loadSources();
+  } catch (err) {
+    sourcesOutput.textContent = err.message;
   }
 });
 
