@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
@@ -42,6 +43,20 @@ def download_letter(path: str):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Letter file not found",
+        )
+
+    suffix = Path(path).suffix.lower()
+    if suffix == ".pdf":
+        return FileResponse(
+            path=path,
+            filename="lettre_motivation.pdf",
+            media_type="application/pdf",
+        )
+    if suffix == ".tex":
+        return FileResponse(
+            path=path,
+            filename="lettre_motivation.tex",
+            media_type="application/x-tex; charset=utf-8",
         )
 
     return FileResponse(

@@ -18,9 +18,16 @@ from app.services.resume_generator import (
 from app.services.scoring import compute_compatibility_score, compute_ats_score
 from app.services.github_service import fetch_github_projects
 from app.services.docx_exporter import export_resume_to_docx
-from app.services.latex_exporter import export_latex_to_pdf_with_tectonic
-from app.services.letter_exporter import export_cover_letter_to_txt
-from app.services.llm_cover_letter import generate_cover_letter_with_llm
+from app.services.latex_exporter import (
+    export_latex_to_pdf_with_tectonic,
+    export_cover_letter_template_to_pdf,
+    export_cover_letter_latex_to_pdf,
+)
+from app.services.letter_exporter import export_cover_letter_to_tex, export_cover_letter_to_txt
+from app.services.llm_cover_letter import (
+    generate_cover_letter_with_llm,
+    generate_cover_letter_latex_with_llm,
+)
 
 
 def _fallback_projects_from_cv(parsed_cv: dict) -> list[dict]:
@@ -64,6 +71,8 @@ def run_tailoring_engine(
 
     parsed_cv = parse_cv(profile.master_cv_text)
     parsed_job = parse_job_description(job.raw_text)
+    cover_letter_template_text = (profile.master_cover_letter_text or "").strip()
+    cover_letter_template_latex = (profile.master_cover_letter_latex or "").strip()
 
     projects_to_use = github_projects
     if not projects_to_use and profile.github_username.strip():
@@ -93,7 +102,12 @@ def run_tailoring_engine(
     if use_llm:
         try:
             cover_letter = generate_cover_letter_with_llm(
-                parsed_cv, parsed_job, selected_projects, output_language=output_language
+                parsed_cv,
+                parsed_job,
+                selected_projects,
+                output_language=output_language,
+                master_cover_letter_text=cover_letter_template_text,
+                master_cover_letter_latex=cover_letter_template_latex,
             )
         except Exception:
             cover_letter = generate_cover_letter(
@@ -115,8 +129,8 @@ def run_tailoring_engine(
     compatibility_score = compute_compatibility_score(parsed_cv, parsed_job, selected_projects)
     ats_score = compute_ats_score(tailored_resume_markdown, parsed_job)
     docx_path = export_resume_to_docx(tailored_resume_markdown)
-    cover_letter_path = export_cover_letter_to_txt(cover_letter)
     latex_source = (master_cv_latex or "").strip() or (profile.master_cv_latex or "").strip()
+    cover_letter_path = ""
 
     pdf_path = export_latex_to_pdf_with_tectonic(
         master_cv_latex=latex_source,
@@ -125,6 +139,30 @@ def run_tailoring_engine(
         selected_projects=selected_projects,
         output_language=output_language,
     )
+
+    if use_llm and cover_letter_template_latex:
+        try:
+            cover_letter_path = export_cover_letter_template_to_pdf(
+                master_cover_letter_latex=cover_letter_template_latex,
+                cover_letter_text=cover_letter,
+                output_language=output_language,
+                parsed_job=parsed_job,
+            )
+        except Exception:
+            try:
+                tailored_cover_letter_latex = generate_cover_letter_latex_with_llm(
+                    parsed_cv=parsed_cv,
+                    parsed_job=parsed_job,
+                    selected_projects=selected_projects,
+                    master_cover_letter_latex=cover_letter_template_latex,
+                    output_language=output_language,
+                )
+                export_cover_letter_to_tex(tailored_cover_letter_latex)
+                cover_letter_path = export_cover_letter_latex_to_pdf(tailored_cover_letter_latex)
+            except Exception:
+                cover_letter_path = export_cover_letter_to_txt(cover_letter)
+    else:
+        cover_letter_path = export_cover_letter_to_txt(cover_letter)
 
     profile.parsed_summary_json = json.dumps(parsed_cv, ensure_ascii=False)
     job.parsed_json = json.dumps(parsed_job, ensure_ascii=False)

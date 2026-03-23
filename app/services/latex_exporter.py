@@ -3,6 +3,8 @@ import re
 from pathlib import Path
 from uuid import uuid4
 
+from app.services.llm_cover_letter import cover_letter_salutation
+
 
 def _escape_latex(value: str) -> str:
     replacements = {
@@ -325,6 +327,71 @@ def compile_master_latex_to_pdf(master_cv_latex: str) -> str:
     return _compile_latex_source_to_pdf(master_cv_latex, "master_resume")
 
 
+def compile_master_cover_letter_latex_to_pdf(master_cover_letter_latex: str) -> str:
+    if not master_cover_letter_latex.strip():
+        return ""
+    return _compile_latex_source_to_pdf(master_cover_letter_latex, "master_cover_letter")
+
+
+def _strip_cover_letter_salutation_and_signature(cover_letter_text: str) -> str:
+    text = (cover_letter_text or "").strip().replace("\r\n", "\n")
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    if not paragraphs:
+        return ""
+
+    if re.match(r"^(madame|monsieur|dear|hello|bonjou?r)\b", paragraphs[0], flags=re.IGNORECASE):
+        paragraphs = paragraphs[1:]
+
+    while paragraphs and re.match(
+        r"^(cordialement|bien cordialement|sincerely|regards|best regards|merci)",
+        paragraphs[-1],
+        flags=re.IGNORECASE,
+    ):
+        paragraphs = paragraphs[:-1]
+
+    return "\n\n".join(paragraphs).strip()
+
+
+def render_cover_letter_template(
+    master_cover_letter_latex: str,
+    cover_letter_text: str,
+    output_language: str = "fr",
+    parsed_job: dict | None = None,
+) -> str:
+    source = (master_cover_letter_latex or "").strip()
+    if not source:
+        return ""
+
+    body = _strip_cover_letter_salutation_and_signature(cover_letter_text)
+    if not body:
+        body = (cover_letter_text or "").strip()
+
+    escaped_paragraphs = []
+    for paragraph in [p.strip() for p in re.split(r"\n\s*\n", body) if p.strip()]:
+        escaped_paragraphs.append(_escape_latex(paragraph))
+    replacement_body = "\n\n".join(escaped_paragraphs).strip()
+
+    if not replacement_body:
+        raise RuntimeError("No cover letter body available for LaTeX template rendering")
+
+    salutation = cover_letter_salutation(parsed_job=parsed_job, output_language=output_language)
+    source = re.sub(r"\\opening\{[^}]*\}", f"\\\\opening{{{salutation}}}", source, count=1)
+
+    match = re.search(r"(?s)(\\opening\{[^}]*\})(.*?)(\\closing\{[^}]*\})", source)
+    if match:
+        return source[: match.start(2)] + "\n\n" + replacement_body + "\n\n" + source[match.start(3) :]
+
+    end_letter = source.find(r"\end{letter}")
+    if end_letter != -1:
+        return source[:end_letter] + "\n\n" + replacement_body + "\n\n" + source[end_letter:]
+
+    end_document = source.find(r"\end{document}")
+    if end_document != -1:
+        return source[:end_document] + "\n\n" + replacement_body + "\n\n" + source[end_document:]
+
+    raise RuntimeError("Unable to find insertion point in cover letter LaTeX template")
+
+
 def export_latex_to_pdf_with_tectonic(
     master_cv_latex: str,
     tailored_summary: str,
@@ -343,3 +410,26 @@ def export_latex_to_pdf_with_tectonic(
         output_language=output_language,
     )
     return _compile_latex_source_to_pdf(latex_source, "tailored_resume")
+
+
+def export_cover_letter_latex_to_pdf(master_cover_letter_latex: str) -> str:
+    if not master_cover_letter_latex.strip():
+        return ""
+    return _compile_latex_source_to_pdf(master_cover_letter_latex, "tailored_cover_letter")
+
+
+def export_cover_letter_template_to_pdf(
+    master_cover_letter_latex: str,
+    cover_letter_text: str,
+    output_language: str = "fr",
+    parsed_job: dict | None = None,
+) -> str:
+    if not master_cover_letter_latex.strip():
+        return ""
+    latex_source = render_cover_letter_template(
+        master_cover_letter_latex,
+        cover_letter_text,
+        output_language=output_language,
+        parsed_job=parsed_job,
+    )
+    return _compile_latex_source_to_pdf(latex_source, "tailored_cover_letter")
