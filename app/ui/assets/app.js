@@ -3,6 +3,8 @@ const appView = document.getElementById("app-view");
 const tokenStatus = document.getElementById("token-status");
 const profilesOutput = document.getElementById("profiles-output");
 const jobsOutput = document.getElementById("jobs-output");
+const thesisOutput = document.getElementById("thesis-output");
+const thesisResults = document.getElementById("thesis-results");
 const tailorOutput = document.getElementById("tailor-output");
 const cvLink = document.getElementById("cv-link") || document.getElementById("pdf-link");
 const letterLink = document.getElementById("letter-link") || document.getElementById("docx-link");
@@ -27,9 +29,19 @@ let token = localStorage.getItem("cv_tailor_token") || "";
 const latexByProfile = JSON.parse(localStorage.getItem("cv_tailor_latex_by_profile") || "{}");
 let defaultProfileId = null;
 let compiledCvObjectUrl = "";
+let latestThesisOffers = [];
 
 function pretty(data) {
   return JSON.stringify(data, null, 2);
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function latexToPlainText(latex) {
@@ -64,6 +76,110 @@ function setDownloadLinks(pdfPath = "", letterPath = "") {
     letterLink.href = "#";
     letterLink.classList.add("disabled");
   }
+}
+
+function thesisOfferToRawText(offer) {
+  const sections = [
+    ["Title", offer.title],
+    ["Lab", offer.lab_name],
+    ["City", offer.city],
+    ["Speciality", offer.speciality],
+    ["Research Theme", offer.research_theme],
+    ["Funding Type", offer.funding_type],
+    ["Candidate Profile", offer.candidate_profile],
+    ["Summary", offer.summary],
+    ["Application URL", offer.application_url],
+    ["Detail URL", offer.detail_url],
+    ["Match Reason", offer.match_reason],
+  ];
+
+  return sections
+    .filter(([, value]) => String(value || "").trim())
+    .map(([label, value]) => `${label}: ${String(value).trim()}`)
+    .join("\n\n");
+}
+
+function renderThesisResults(offers) {
+  latestThesisOffers = Array.isArray(offers) ? offers : [];
+
+  if (!thesisResults) {
+    return;
+  }
+
+  if (!latestThesisOffers.length) {
+    thesisResults.innerHTML = "";
+    thesisResults.classList.add("hidden");
+    return;
+  }
+
+  thesisResults.innerHTML = latestThesisOffers
+    .map((offer, index) => {
+      const meta = [
+        offer.lab_name,
+        offer.city,
+        offer.speciality,
+        offer.funding_type,
+      ]
+        .filter(Boolean)
+        .map((value) => `<span class="meta-chip">${escapeHtml(value)}</span>`)
+        .join("");
+
+      return `
+        <article class="result-card">
+          <div class="result-head">
+            <div>
+              <h3 class="result-title">${escapeHtml(offer.title || "Sujet sans titre")}</h3>
+            </div>
+            <span class="score-pill">Score ${escapeHtml(offer.match_score)}</span>
+          </div>
+          <div class="result-meta">${meta}</div>
+          <p class="result-summary">${escapeHtml(offer.summary || "Resume indisisponible.")}</p>
+          <p class="result-reason">${escapeHtml(offer.match_reason || "")}</p>
+          <div class="result-actions">
+            ${
+              offer.detail_url
+                ? `<a class="link" href="${escapeHtml(offer.detail_url)}" target="_blank" rel="noreferrer">Voir l'offre</a>`
+                : ""
+            }
+            <button type="button" class="ghost thesis-import-btn" data-offer-index="${index}">Importer comme job</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+  thesisResults.classList.remove("hidden");
+
+  thesisResults.querySelectorAll(".thesis-import-btn").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const offerIndex = Number(button.dataset.offerIndex);
+      const offer = latestThesisOffers[offerIndex];
+      if (!offer) {
+        return;
+      }
+
+      button.disabled = true;
+      try {
+        const imported = await api("/thesis-discovery/import", {
+          method: "POST",
+          body: JSON.stringify({
+            title: offer.title,
+            source_url: offer.application_url || offer.detail_url || "",
+            raw_text: thesisOfferToRawText(offer),
+          }),
+        });
+        jobsOutput.textContent = pretty(imported);
+        thesisOutput.textContent = `Offre importee: job_id=${imported.job_id}`;
+        const jobInput = document.querySelector("input[name='job_posting_id']");
+        if (jobInput) {
+          jobInput.value = imported.job_id;
+        }
+      } catch (err) {
+        thesisOutput.textContent = err.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
 }
 
 function setRegisterProfileFormat(format) {
@@ -148,6 +264,7 @@ function setAuthState(isConnected) {
   tokenStatus.textContent = isConnected ? "connecté" : "non connecté";
   if (!isConnected) {
     defaultProfileId = null;
+    latestThesisOffers = [];
     if (compiledCvObjectUrl) {
       URL.revokeObjectURL(compiledCvObjectUrl);
       compiledCvObjectUrl = "";
@@ -155,6 +272,13 @@ function setAuthState(isConnected) {
     compiledCvFrame.src = "about:blank";
     compiledCvFrame.classList.add("hidden");
     profilesOutput.textContent = "";
+    if (thesisOutput) {
+      thesisOutput.textContent = "";
+    }
+    if (thesisResults) {
+      thesisResults.innerHTML = "";
+      thesisResults.classList.add("hidden");
+    }
   }
 }
 
@@ -410,7 +534,8 @@ document.querySelectorAll("input[name='register_profile_format']").forEach((inpu
 });
 
 registerLetterEnabledInput.addEventListener("change", () => {
-  const selectedFormat = document.querySelector("input[name='register_letter_format']:checked")?.value || "text";
+  const selectedLetterFormatInput = document.querySelector("input[name='register_letter_format']:checked");
+  const selectedFormat = selectedLetterFormatInput ? selectedLetterFormatInput.value : "text";
   setRegisterLetterFormat(selectedFormat, registerLetterEnabledInput.checked);
 });
 
@@ -450,6 +575,42 @@ document.getElementById("load-jobs").addEventListener("click", async () => {
     }
   } catch (err) {
     jobsOutput.textContent = err.message;
+  }
+});
+
+document.getElementById("thesis-search-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!defaultProfileId) {
+    thesisOutput.textContent = "Aucun profil master trouve pour ce compte.";
+    renderThesisResults([]);
+    return;
+  }
+
+  const form = new FormData(e.currentTarget);
+  const payload = {
+    profile_id: defaultProfileId,
+    discipline: String(form.get("discipline") || "").trim(),
+    localisation: String(form.get("localisation") || "").trim(),
+    page_limit: Number(form.get("page_limit") || 3),
+    page_size: Number(form.get("page_size") || 10),
+  };
+
+  thesisOutput.textContent = "Recherche en cours...";
+  renderThesisResults([]);
+
+  try {
+    const data = await api("/thesis-discovery/search", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    thesisOutput.textContent = pretty({
+      total_candidates: data.total_candidates,
+      displayed_offers: Array.isArray(data.offers) ? data.offers.length : 0,
+    });
+    renderThesisResults(data.offers || []);
+  } catch (err) {
+    thesisOutput.textContent = err.message;
+    renderThesisResults([]);
   }
 });
 
