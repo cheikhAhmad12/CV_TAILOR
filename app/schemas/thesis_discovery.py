@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 class ThesisDiscoverySearchRequest(BaseModel):
     profile_id: int
+    source: str = "doctorat_gouv"
     page_limit: int = Field(default=3, ge=1, le=10)
     page_size: int = Field(default=20, ge=1, le=50)
     discipline: str = ""

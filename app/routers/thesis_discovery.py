@@ -14,11 +14,13 @@ from app.schemas.thesis_discovery import (
     ThesisOffer,
 )
 from app.services.cv_parser import parse_cv
+from app.services.anrt_cifre_service import ANRT_CIFRE_SOURCE, fetch_anrt_cifre_offers
 from app.services.doctorat_gouv_service import (
+    SOURCE_NAME as DOCTORAT_GOUV_SOURCE,
     build_profile_search_intent,
     fetch_thesis_offers,
     normalize_thesis_offer,
-    score_thesis_offer,
+    score_thesis_offers,
 )
 
 
@@ -40,14 +42,24 @@ def search_thesis_offers(
 
     collected: list[dict] = []
     try:
-        for page in range(payload.page_limit):
-            data = fetch_thesis_offers(
-                page=page,
-                size=payload.page_size,
+        if payload.source == DOCTORAT_GOUV_SOURCE:
+            for page in range(payload.page_limit):
+                data = fetch_thesis_offers(
+                    page=page,
+                    size=payload.page_size,
+                    discipline=payload.discipline,
+                    localisation=payload.localisation,
+                )
+                collected.extend(data.get("content", []) or [])
+        elif payload.source == ANRT_CIFRE_SOURCE:
+            collected = fetch_anrt_cifre_offers(
+                page_limit=payload.page_limit,
+                page_size=payload.page_size,
                 discipline=payload.discipline,
                 localisation=payload.localisation,
             )
-            collected.extend(data.get("content", []) or [])
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported thesis source: {payload.source}")
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -55,8 +67,7 @@ def search_thesis_offers(
         ) from exc
 
     ranked: list[dict] = []
-    for offer in collected:
-        score, reason = score_thesis_offer(offer, intent)
+    for offer, score, reason in score_thesis_offers(collected, intent):
         ranked.append(normalize_thesis_offer(offer, score, reason))
 
     ranked.sort(key=lambda item: item["match_score"], reverse=True)

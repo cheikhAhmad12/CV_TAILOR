@@ -138,6 +138,10 @@
         <section class="card">
           <h2>3. Trouver des theses</h2>
           <form id="thesis-search-form" class="stack">
+            <select name="source">
+              <option value="doctorat_gouv" selected>doctorat.gouv.fr</option>
+              <option value="anrt_cifre">ANRT CIFRE</option>
+            </select>
             <input name="discipline" type="text" placeholder="Discipline (optionnel)" />
             <input name="localisation" type="text" placeholder="Localisation (optionnel)" />
             <div class="search-grid">
@@ -146,8 +150,11 @@
             </div>
             <button type="submit">Rechercher des theses</button>
           </form>
+          <p class="hint">ANRT CIFRE utilise une session authentifiee. La recherche s'appuie sur les identifiants configures dans l'environnement backend.</p>
           <pre id="thesis-output" class="output"></pre>
-          <div id="thesis-results" class="results-list hidden"></div>
+          <div id="thesis-results-panel" class="scroll-panel hidden">
+            <div id="thesis-results" class="results-list"></div>
+          </div>
         </section>
 
         <section class="card">
@@ -168,6 +175,6 @@
       </section>
     </main>
 
-    <script src="/assets/app.js?v=20260323a"></script>
+    <script src="/assets/app.js?v=20260323b"></script>
   </body>
 </html>

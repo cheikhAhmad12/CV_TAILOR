@@ -6,6 +6,7 @@ const jobsOutput = document.getElementById("jobs-output");
 const jobsPanel = document.getElementById("jobs-panel");
 const toggleJobsOutputBtn = document.getElementById("toggle-jobs-output");
 const thesisOutput = document.getElementById("thesis-output");
+const thesisResultsPanel = document.getElementById("thesis-results-panel");
 const thesisResults = document.getElementById("thesis-results");
 const tailorOutput = document.getElementById("tailor-output");
 const cvLink = document.getElementById("cv-link") || document.getElementById("pdf-link");
@@ -119,7 +120,9 @@ function renderThesisResults(offers) {
 
   if (!latestThesisOffers.length) {
     thesisResults.innerHTML = "";
-    thesisResults.classList.add("hidden");
+    if (thesisResultsPanel) {
+      thesisResultsPanel.classList.add("hidden");
+    }
     return;
   }
 
@@ -158,7 +161,9 @@ function renderThesisResults(offers) {
       `;
     })
     .join("");
-  thesisResults.classList.remove("hidden");
+  if (thesisResultsPanel) {
+    thesisResultsPanel.classList.remove("hidden");
+  }
 
   thesisResults.querySelectorAll(".thesis-import-btn").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -288,7 +293,9 @@ function setAuthState(isConnected) {
     }
     if (thesisResults) {
       thesisResults.innerHTML = "";
-      thesisResults.classList.add("hidden");
+    }
+    if (thesisResultsPanel) {
+      thesisResultsPanel.classList.add("hidden");
     }
   }
 }
@@ -608,6 +615,7 @@ document.getElementById("thesis-search-form").addEventListener("submit", async (
   const form = new FormData(e.currentTarget);
   const payload = {
     profile_id: defaultProfileId,
+    source: String(form.get("source") || "doctorat_gouv").trim(),
     discipline: String(form.get("discipline") || "").trim(),
     localisation: String(form.get("localisation") || "").trim(),
     page_limit: Number(form.get("page_limit") || 3),

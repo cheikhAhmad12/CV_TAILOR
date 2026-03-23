@@ -153,12 +153,14 @@ body {
 }
 
 input,
+select,
 textarea,
 button {
   font: inherit;
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid #c7d7d0;
@@ -221,6 +223,10 @@ button.ghost:active {
 .scroll-panel {
   max-height: 380px;
   overflow: auto;
+}
+
+#thesis-results-panel {
+  max-height: 520px;
 }
 
 .pdf-preview {
